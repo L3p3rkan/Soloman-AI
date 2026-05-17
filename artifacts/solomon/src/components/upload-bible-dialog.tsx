@@ -95,11 +95,11 @@ export function UploadBibleDialog({ open, onOpenChange }: UploadBibleDialogProps
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="file">Bible JSON File</Label>
+            <Label htmlFor="file">Bible File (.json or .txt)</Label>
             <Input 
               id="file" 
               type="file" 
-              accept="application/json"
+              accept="application/json,.json,text/plain,.txt"
               onChange={(e) => setFile(e.target.files?.[0] || null)} 
               required
               data-testid="input-version-file"

@@ -6,6 +6,7 @@ import {
   saveBibleVersion,
   deleteBibleVersion,
   getBibleVersionMeta,
+  parsePlainTextBible,
   type BibleData,
 } from "../../lib/bible";
 import { DeleteBibleVersionParams } from "@workspace/api-zod";
@@ -17,10 +18,12 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/json" || file.originalname.endsWith(".json")) {
+    const isJson = file.mimetype === "application/json" || file.originalname.endsWith(".json");
+    const isTxt = file.mimetype === "text/plain" || file.originalname.endsWith(".txt");
+    if (isJson || isTxt) {
       cb(null, true);
     } else {
-      cb(new Error("Only JSON files are supported"));
+      cb(new Error("Only JSON or plain text (.txt) files are supported"));
     }
   },
 });
@@ -50,30 +53,39 @@ router.post(
       return;
     }
 
+    const isTxt =
+      req.file.mimetype === "text/plain" || req.file.originalname.endsWith(".txt");
+
     let bibleData: BibleData;
     try {
-      const raw = JSON.parse(req.file.buffer.toString("utf-8"));
-
-      // Normalize various common JSON Bible formats
-      if (Array.isArray(raw)) {
-        // Format: array of books
-        bibleData = { version: abbreviation, books: raw };
-      } else if (raw.books && Array.isArray(raw.books)) {
-        // Standard format: { version, books[] }
-        bibleData = raw as BibleData;
-      } else if (raw.OSIS) {
-        // OSIS-derived JSON — not yet supported
-        res.status(400).json({
-          error:
-            "OSIS format is not currently supported. Please convert to standard JSON format: { books: [{ name, chapters: [{ chapter, verses: [{ verse, text }] }] }] }",
-        });
-        return;
+      if (isTxt) {
+        // Plain-text Bible format
+        const text = req.file.buffer.toString("utf-8");
+        bibleData = parsePlainTextBible(text, abbreviation);
       } else {
-        res.status(400).json({
-          error:
-            "Unrecognized Bible JSON format. Expected: { books: [{ name, chapters: [{ chapter, verses: [{ verse, text }] }] }] }",
-        });
-        return;
+        // JSON Bible format
+        const raw = JSON.parse(req.file.buffer.toString("utf-8"));
+
+        // Normalize various common JSON Bible formats
+        if (Array.isArray(raw)) {
+          // Format: array of books
+          bibleData = { version: abbreviation, books: raw };
+        } else if (raw.books && Array.isArray(raw.books)) {
+          // Standard format: { version, books[] }
+          bibleData = raw as BibleData;
+        } else if (raw.OSIS) {
+          res.status(400).json({
+            error:
+              "OSIS format is not currently supported. Please convert to standard JSON format: { books: [{ name, chapters: [{ chapter, verses: [{ verse, text }] }] }] }",
+          });
+          return;
+        } else {
+          res.status(400).json({
+            error:
+              "Unrecognized Bible JSON format. Expected: { books: [{ name, chapters: [{ chapter, verses: [{ verse, text }] }] }] }",
+          });
+          return;
+        }
       }
 
       if (!bibleData.books || bibleData.books.length === 0) {
@@ -81,8 +93,9 @@ router.post(
         return;
       }
     } catch (e) {
-      req.log.warn({ err: e }, "Invalid Bible JSON file");
-      res.status(400).json({ error: "Invalid JSON file" });
+      const msg = e instanceof Error ? e.message : "Failed to parse Bible file";
+      req.log.warn({ err: e, isTxt }, "Invalid Bible file");
+      res.status(400).json({ error: msg });
       return;
     }
 
