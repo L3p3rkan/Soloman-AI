@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/solomon-mobile/"
+title = "Solomon Mobile"
+version = "1.0.0"
+id = "artifacts/solomon-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/solomon-mobile/" ]
+localPort = 23971
+
+[services.development]
+run = "pnpm --filter @workspace/solomon-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/solomon-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/solomon-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "23971"
+BASE_PATH = "/solomon-mobile/"
