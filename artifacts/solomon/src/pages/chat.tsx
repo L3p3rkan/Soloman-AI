@@ -21,8 +21,10 @@ export default function ChatPage() {
   const conversationIdStr = searchParams.get("id");
   const conversationId = conversationIdStr ? parseInt(conversationIdStr, 10) : null;
 
-  const { data: conversation, isLoading: isLoadingConversation } = useGetOpenaiConversation(conversationId || 0, { query: { enabled: !!conversationId } });
-  const { data: messages = [], isLoading: isLoadingMessages } = useListOpenaiMessages(conversationId || 0, { query: { enabled: !!conversationId } });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: conversation, isLoading: isLoadingConversation } = useGetOpenaiConversation(conversationId || 0, { query: { enabled: !!conversationId } as any });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: messages = [], isLoading: isLoadingMessages } = useListOpenaiMessages(conversationId || 0, { query: { enabled: !!conversationId } as any });
   const deleteConversation = useDeleteOpenaiConversation();
   const createConversation = useCreateOpenaiConversation();
   

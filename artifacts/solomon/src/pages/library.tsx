@@ -111,7 +111,7 @@ export default function LibraryPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-2 right-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-2 right-2 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                     onClick={() => handleDelete(version.id)}
                     data-testid={`button-delete-version-${version.id}`}
                   >
