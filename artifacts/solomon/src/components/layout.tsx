@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { BookOpen, MessageSquare, Plus, Moon, Sun, Settings, Menu, X } from "lucide-react";
+import { BookOpen, Plus, Moon, Sun, Settings, Menu, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useListOpenaiConversations, useCreateOpenaiConversation } from "@workspace/api-client-react";
 import { useTheme } from "./theme-provider";
+import { useClerk, useUser } from "@clerk/react";
 import { format } from "date-fns";
 
 interface LayoutProps {
@@ -17,6 +18,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { data: conversations = [], isLoading } = useListOpenaiConversations();
   const createConversation = useCreateOpenaiConversation();
   const { theme, setTheme } = useTheme();
+  const { signOut } = useClerk();
+  const { user } = useUser();
 
   const handleNewChat = () => {
     createConversation.mutate(
@@ -28,6 +31,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         },
       }
     );
+  };
+
+  const handleSignOut = () => {
+    signOut({ redirectUrl: "/" });
   };
 
   return (
@@ -101,7 +108,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </ScrollArea>
 
-      <div className="p-3 border-t flex-shrink-0">
+      <div className="p-3 border-t flex-shrink-0 space-y-1">
         <Link href="/library">
           <Button
             variant={location === "/library" ? "secondary" : "ghost"}
@@ -113,6 +120,25 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             Library Settings
           </Button>
         </Link>
+
+        {/* User info + sign out */}
+        <div className="flex items-center gap-2 px-2 py-2 rounded-md">
+          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <User className="w-3 h-3 text-primary" />
+          </div>
+          <span className="text-xs text-muted-foreground truncate flex-1">
+            {user?.primaryEmailAddress?.emailAddress ?? user?.firstName ?? "Account"}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-destructive"
+            onClick={handleSignOut}
+            title="Sign out"
+          >
+            <LogOut className="w-3 h-3" />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -123,12 +149,12 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex h-dvh w-full bg-background">
-      {/* Desktop sidebar — hidden on mobile */}
+      {/* Desktop sidebar */}
       <div className="hidden md:flex w-72 border-r bg-sidebar flex-col flex-shrink-0 h-full">
         <SidebarContent />
       </div>
 
-      {/* Mobile sidebar — sheet/drawer */}
+      {/* Mobile sidebar */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="p-0 w-72 bg-sidebar border-r [&>button:first-child]:hidden">
           <SidebarContent onNavigate={() => setMobileOpen(false)} />
