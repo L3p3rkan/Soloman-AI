@@ -2,8 +2,15 @@ import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useListBibleVersions, useDeleteBibleVersion, useGetBibleStats, getListBibleVersionsQueryKey, getGetBibleStatsQueryKey } from "@workspace/api-client-react";
-import { BookOpen, Upload, Trash2, Book, FileText, Database } from "lucide-react";
+import {
+  useListBibleVersions,
+  useDeleteBibleVersion,
+  useGetBibleStats,
+  useGetAdminCheck,
+  getListBibleVersionsQueryKey,
+  getGetBibleStatsQueryKey,
+} from "@workspace/api-client-react";
+import { BookOpen, Upload, Trash2, Book, FileText, Database, Lock } from "lucide-react";
 import { UploadBibleDialog } from "@/components/upload-bible-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -12,6 +19,8 @@ export default function LibraryPage() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const { data: versions = [], isLoading: loadingVersions } = useListBibleVersions();
   const { data: stats, isLoading: loadingStats } = useGetBibleStats();
+  const { data: adminData } = useGetAdminCheck();
+  const isAdmin = adminData?.isAdmin ?? false;
   const deleteVersion = useDeleteBibleVersion();
   const queryClient = useQueryClient();
 
@@ -30,7 +39,7 @@ export default function LibraryPage() {
     <Layout>
       <div className="flex-1 overflow-y-auto">
         <header className="h-14 border-b bg-background/95 backdrop-blur flex items-center px-6 sticky top-0 z-10">
-          <h2 className="font-serif font-medium text-lg">Library Settings</h2>
+          <h2 className="font-serif font-medium text-lg">Bible Library</h2>
         </header>
 
         <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -68,12 +77,19 @@ export default function LibraryPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xl font-serif font-medium text-foreground">Available Translations</h3>
-              <p className="text-sm text-muted-foreground mt-1">Manage the scriptures Solomon draws wisdom from.</p>
+              <p className="text-sm text-muted-foreground mt-1">The scriptures Solomon draws wisdom from.</p>
             </div>
-            <Button onClick={() => setUploadOpen(true)} className="gap-2" data-testid="button-upload-bible">
-              <Upload className="w-4 h-4" />
-              Upload JSON
-            </Button>
+            {isAdmin ? (
+              <Button onClick={() => setUploadOpen(true)} className="gap-2" data-testid="button-upload-bible">
+                <Upload className="w-4 h-4" />
+                Upload Bible
+              </Button>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Lock className="w-3 h-3" />
+                Managed by admin
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -85,7 +101,11 @@ export default function LibraryPage() {
               <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl border-muted">
                 <Database className="w-8 h-8 mx-auto mb-3 text-muted-foreground/50" />
                 <p className="font-serif text-lg">No scriptures found</p>
-                <p className="text-sm max-w-sm mx-auto mt-2">Upload a JSON Bible to begin your theological inquiries.</p>
+                <p className="text-sm max-w-sm mx-auto mt-2">
+                  {isAdmin
+                    ? "Upload a Bible file (.json or .txt) to begin."
+                    : "No Bible versions have been added yet."}
+                </p>
               </div>
             ) : (
               versions.map((version) => (
@@ -108,15 +128,17 @@ export default function LibraryPage() {
                       <span>{format(new Date(version.uploadedAt), "MMM d, yyyy")}</span>
                     </div>
                   </CardContent>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleDelete(version.id)}
-                    data-testid={`button-delete-version-${version.id}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleDelete(version.id)}
+                      data-testid={`button-delete-version-${version.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </Card>
               ))
             )}
@@ -124,7 +146,9 @@ export default function LibraryPage() {
         </div>
       </div>
 
-      <UploadBibleDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      {isAdmin && (
+        <UploadBibleDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      )}
     </Layout>
   );
 }

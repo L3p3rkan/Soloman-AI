@@ -10,11 +10,28 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: admin
+    description: Admin operations
   - name: openai
     description: OpenAI AI chat operations
   - name: bible
     description: Bible version management
 paths:
+  /admin/check:
+    get:
+      operationId: getAdminCheck
+      tags: [admin]
+      summary: Check if the current user is an admin
+      responses:
+        "200":
+          description: Admin status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStatus"
+        "401":
+          description: Unauthorized
+
   /healthz:
     get:
       operationId: healthCheck
@@ -320,6 +337,14 @@ components:
         - totalBooks
         - totalVerses
         - versions
+
+    AdminStatus:
+      type: object
+      properties:
+        isAdmin:
+          type: boolean
+      required:
+        - isAdmin
 
     ApiError:
       type: object

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './adminStatus';
 export * from './apiError';
 export * from './bibleStats';
 export * from './bibleVersion';

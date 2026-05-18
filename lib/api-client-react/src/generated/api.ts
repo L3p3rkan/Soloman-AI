@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdminStatus,
   ApiError,
   BibleStats,
   BibleVersion,
@@ -40,6 +41,83 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getGetAdminCheckUrl = () => {
+
+
+
+
+  return `/api/admin/check`
+}
+
+/**
+ * @summary Check if the current user is an admin
+ */
+export const getAdminCheck = async ( options?: RequestInit): Promise<AdminStatus> => {
+
+  return customFetch<AdminStatus>(getGetAdminCheckUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminCheckQueryKey = () => {
+    return [
+    `/api/admin/check`
+    ] as const;
+    }
+
+
+export const getGetAdminCheckQueryOptions = <TData = Awaited<ReturnType<typeof getAdminCheck>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminCheckQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminCheck>>> = ({ signal }) => getAdminCheck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminCheck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminCheckQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminCheck>>>
+export type GetAdminCheckQueryError = ErrorType<void>
+
+
+/**
+ * @summary Check if the current user is an admin
+ */
+
+export function useGetAdminCheck<TData = Awaited<ReturnType<typeof getAdminCheck>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 

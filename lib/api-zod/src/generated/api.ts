@@ -9,6 +9,14 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Check if the current user is an admin
+ */
+export const GetAdminCheckResponse = zod.object({
+  "isAdmin": zod.boolean()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

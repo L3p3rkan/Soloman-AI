@@ -11,6 +11,8 @@ import {
 } from "../../lib/bible";
 import { DeleteBibleVersionParams } from "@workspace/api-zod";
 import { logger } from "../../lib/logger";
+import { requireAuth } from "../../middlewares/requireAuth";
+import { requireAdmin } from "../../middlewares/requireAdmin";
 
 const router: IRouter = Router();
 
@@ -35,6 +37,8 @@ router.get("/bible/versions", async (_req, res): Promise<void> => {
 
 router.post(
   "/bible/upload",
+  requireAuth,
+  requireAdmin,
   upload.single("bible"),
   async (req, res): Promise<void> => {
     if (!req.file) {
@@ -106,7 +110,7 @@ router.post(
   }
 );
 
-router.delete("/bible/versions/:versionId", async (req, res): Promise<void> => {
+router.delete("/bible/versions/:versionId", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = DeleteBibleVersionParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

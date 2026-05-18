@@ -54,6 +54,10 @@ export interface BibleStats {
   versions: BibleVersion[];
 }
 
+export interface AdminStatus {
+  isAdmin: boolean;
+}
+
 export interface ApiError {
   error: string;
 }
