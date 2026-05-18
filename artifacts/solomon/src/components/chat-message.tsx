@@ -26,11 +26,18 @@ export function ChatMessage({ role, content, createdAt, isStreaming }: ChatMessa
             <span className="font-serif font-medium text-sm">
               {isUser ? "You" : "Solomon"}
             </span>
-            {createdAt && (
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(createdAt), "h:mm a")}
-              </span>
-            )}
+            {createdAt && (() => {
+              try {
+                const d = new Date(createdAt);
+                return isNaN(d.getTime()) ? null : (
+                  <span className="text-xs text-muted-foreground">
+                    {format(d, "h:mm a")}
+                  </span>
+                );
+              } catch {
+                return null;
+              }
+            })()}
           </div>
           <div className="prose prose-sm sm:prose-base dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted/50 prose-pre:border max-w-none break-words">
             {isUser ? (
