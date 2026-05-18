@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -16,69 +16,65 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { fetch } from "expo/fetch";
 import { useAuth } from "@clerk/expo";
-import { useGetOpenaiConversation, useListOpenaiMessages } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useGetOpenaiConversation,
+  useListOpenaiMessages,
+  getListOpenaiMessagesQueryKey,
+  getListOpenaiConversationsQueryKey,
+  getGetOpenaiConversationQueryKey,
+} from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 
-interface Message {
-  id: string;
+interface DisplayMessage {
+  key: string;
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
 }
-
-let msgCounter = 0;
-function uid(): string {
-  msgCounter++;
-  return `msg-${Date.now()}-${msgCounter}`;
-}
-
-const ASSISTANT_STREAMING_ID = "assistant-streaming";
 
 export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const convId = Number(id);
   const { getToken } = useAuth();
+  const queryClient = useQueryClient();
   const inputRef = useRef<TextInput>(null);
-  const flatListRef = useRef<FlatList>(null);
   const styles = makeStyles(colors);
 
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const initialized = useRef(false);
+  const [optimisticUser, setOptimisticUser] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
 
-  const { data: conversation } = useGetOpenaiConversation(Number(id));
-  const { data: serverMessages } = useListOpenaiMessages(Number(id));
+  const { data: conversation } = useGetOpenaiConversation(convId);
+  const { data: serverMessages = [] } = useListOpenaiMessages(convId);
 
-  useEffect(() => {
-    if (serverMessages && !initialized.current) {
-      initialized.current = true;
-      setMessages(
-        serverMessages.map((m) => ({
-          id: uid(),
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        }))
-      );
-    }
-  }, [serverMessages]);
+  // Build display list: persisted messages + optimistic overlay
+  const allMessages: DisplayMessage[] = [
+    ...serverMessages.map((m) => ({
+      key: String(m.id),
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    })),
+    ...(optimisticUser !== null
+      ? [{ key: "opt-user", role: "user" as const, content: optimisticUser }]
+      : []),
+    ...(isStreaming
+      ? [
+          {
+            key: "opt-assistant",
+            role: "assistant" as const,
+            content: streamingContent ?? "•••",
+            streaming: true,
+          },
+        ]
+      : []),
+  ];
 
-  const updateStreamingMessage = useCallback((content: string, done = false) => {
-    setMessages((prev) => {
-      const idx = prev.findIndex((m) => m.id === ASSISTANT_STREAMING_ID);
-      if (idx === -1) {
-        return [...prev, { id: ASSISTANT_STREAMING_ID, role: "assistant", content, streaming: !done }];
-      }
-      const updated = [...prev];
-      updated[idx] = { ...updated[idx], content, streaming: !done };
-      if (done) {
-        updated[idx] = { ...updated[idx], id: uid(), streaming: false };
-      }
-      return updated;
-    });
-  }, []);
+  const reversed = [...allMessages].reverse();
 
   const handleSend = async () => {
     const text = input.trim();
@@ -88,18 +84,17 @@ export default function ChatScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    setMessages((prev) => [...prev, { id: uid(), role: "user", content: text }]);
     setInput("");
+    setOptimisticUser(text);
+    setStreamingContent(null);
     setIsStreaming(true);
-
-    updateStreamingMessage("•••", false);
 
     try {
       const token = await getToken();
       const domain = process.env.EXPO_PUBLIC_DOMAIN;
       const url = domain
-        ? `https://${domain}/api/openai/conversations/${id}/messages`
-        : `/api/openai/conversations/${id}/messages`;
+        ? `https://${domain}/api/openai/conversations/${convId}/messages`
+        : `/api/openai/conversations/${convId}/messages`;
 
       const response = await fetch(url, {
         method: "POST",
@@ -111,8 +106,7 @@ export default function ChatScreen() {
       });
 
       if (!response.ok) {
-        const errText = await response.text().catch(() => String(response.status));
-        throw new Error(`HTTP ${response.status}: ${errText}`);
+        throw new Error(`HTTP ${response.status}`);
       }
 
       let fullContent = "";
@@ -121,15 +115,12 @@ export default function ChatScreen() {
       if (reader) {
         const decoder = new TextDecoder();
         let buffer = "";
-
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
-
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             try {
@@ -137,12 +128,13 @@ export default function ChatScreen() {
               if (parsed.done) continue;
               if (parsed.content) {
                 fullContent += parsed.content;
-                updateStreamingMessage(fullContent, false);
+                setStreamingContent(fullContent);
               }
             } catch {}
           }
         }
       } else {
+        // Fallback for platforms where ReadableStream isn't available
         const rawText = await response.text();
         for (const line of rawText.split("\n")) {
           if (!line.startsWith("data: ")) continue;
@@ -152,24 +144,18 @@ export default function ChatScreen() {
             if (parsed.content) fullContent += parsed.content;
           } catch {}
         }
-      }
-
-      if (fullContent) {
-        updateStreamingMessage(fullContent, true);
-      } else {
-        setMessages((prev) => prev.filter((m) => m.id !== ASSISTANT_STREAMING_ID));
-        throw new Error("No content received from server");
+        setStreamingContent(fullContent);
       }
     } catch (e) {
-      console.error("[Chat] Error:", e);
-      setMessages((prev) => {
-        const withoutStreaming = prev.filter((m) => m.id !== ASSISTANT_STREAMING_ID);
-        return [
-          ...withoutStreaming,
-          { id: uid(), role: "assistant", content: "Something went wrong. Please try again." },
-        ];
-      });
+      console.error("[Chat] send error:", e);
     } finally {
+      // Pull the persisted messages from the server (both user + assistant are now saved)
+      await queryClient.invalidateQueries({ queryKey: getListOpenaiMessagesQueryKey(convId) });
+      await queryClient.invalidateQueries({ queryKey: getGetOpenaiConversationQueryKey(convId) });
+      queryClient.invalidateQueries({ queryKey: getListOpenaiConversationsQueryKey() });
+
+      setOptimisticUser(null);
+      setStreamingContent(null);
       setIsStreaming(false);
       inputRef.current?.focus();
     }
@@ -178,14 +164,13 @@ export default function ChatScreen() {
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const reversed = [...messages].reverse();
-
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: topPad }]}
       behavior="padding"
       keyboardVerticalOffset={0}
     >
+      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={colors.foreground} />
@@ -199,11 +184,11 @@ export default function ChatScreen() {
         <View style={{ width: 38 }} />
       </View>
 
+      {/* Messages */}
       <FlatList
-        ref={flatListRef}
         data={reversed}
-        keyExtractor={(item) => item.id}
-        inverted={messages.length > 0}
+        keyExtractor={(item) => item.key}
+        inverted={allMessages.length > 0}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -222,6 +207,7 @@ export default function ChatScreen() {
         renderItem={({ item }) => <MessageBubble message={item} colors={colors} />}
       />
 
+      {/* Input */}
       <View style={[styles.inputRow, { paddingBottom: botPad + 8 }]}>
         <TextInput
           ref={inputRef}
@@ -258,11 +244,11 @@ function MessageBubble({
   message,
   colors,
 }: {
-  message: Message;
+  message: DisplayMessage;
   colors: ReturnType<typeof useColors>;
 }) {
   const isUser = message.role === "user";
-  const isTypingPlaceholder = message.streaming && message.content === "•••";
+  const isPlaceholder = message.streaming && message.content === "•••";
 
   return (
     <View style={[bubbleStyles.row, isUser && bubbleStyles.rowUser]}>
@@ -287,15 +273,13 @@ function MessageBubble({
         <Text
           style={[
             bubbleStyles.text,
-            {
-              color: isUser ? colors.primaryForeground : colors.foreground,
-              ...(isTypingPlaceholder && { color: colors.mutedForeground, fontSize: 20, letterSpacing: 3 }),
-            },
+            { color: isUser ? colors.primaryForeground : colors.foreground },
+            isPlaceholder && { color: colors.mutedForeground, fontSize: 20, letterSpacing: 4 },
           ]}
         >
           {message.content}
         </Text>
-        {message.streaming && !isTypingPlaceholder && (
+        {message.streaming && !isPlaceholder && (
           <View style={[bubbleStyles.cursor, { backgroundColor: colors.primary }]} />
         )}
       </View>
@@ -320,7 +304,7 @@ const bubbleStyles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   text: { fontSize: 15, lineHeight: 22, fontFamily: "Inter_400Regular" },
-  cursor: { width: 2, height: 16, borderRadius: 1, marginTop: 2 },
+  cursor: { width: 2, height: 16, borderRadius: 1, marginTop: 4 },
 });
 
 function makeStyles(colors: ReturnType<typeof useColors>) {
@@ -343,11 +327,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       color: colors.foreground,
       fontFamily: "Inter_600SemiBold",
     },
-    headerSub: {
-      fontSize: 11,
-      color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
-    },
+    headerSub: { fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular" },
     emptyChat: {
       flex: 1,
       alignItems: "center",

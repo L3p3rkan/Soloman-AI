@@ -259,5 +259,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     footer: { flexDirection: "row", justifyContent: "center", marginTop: 28 },
     footerText: { color: colors.mutedForeground, fontSize: 14, fontFamily: "Inter_400Regular" },
     link: { color: colors.primary, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+    ghostBtn: { alignItems: "center", paddingVertical: 12, marginTop: 4 },
+    ghostBtnText: { color: colors.mutedForeground, fontSize: 14, fontFamily: "Inter_400Regular" },
   });
 }
