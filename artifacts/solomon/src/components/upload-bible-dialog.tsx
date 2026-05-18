@@ -37,7 +37,12 @@ export function UploadBibleDialog({ open, onOpenChange }: UploadBibleDialogProps
       });
 
       if (!response.ok) {
-        throw new Error("Failed to upload Bible version");
+        let detail = "There was an error uploading the Bible file.";
+        try {
+          const body = await response.json();
+          if (body?.error) detail = body.error;
+        } catch {}
+        throw new Error(detail);
       }
 
       toast({
@@ -55,7 +60,7 @@ export function UploadBibleDialog({ open, onOpenChange }: UploadBibleDialogProps
       toast({
         variant: "destructive",
         title: "Upload Failed",
-        description: "There was an error uploading the Bible file.",
+        description: error instanceof Error ? error.message : "There was an error uploading the Bible file.",
       });
     } finally {
       setIsUploading(false);
@@ -68,7 +73,7 @@ export function UploadBibleDialog({ open, onOpenChange }: UploadBibleDialogProps
         <DialogHeader>
           <DialogTitle className="font-serif">Add to Library</DialogTitle>
           <DialogDescription>
-            Upload a JSON format Bible to expand Solomon's wisdom.
+            Upload a Bible file (.json or .txt) to expand Solomon's wisdom.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleUpload} className="space-y-4 pt-4">
