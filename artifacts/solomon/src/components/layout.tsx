@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { BookOpen, Plus, Moon, Sun, Settings, Menu, LogOut, User } from "lucide-react";
+import { BookOpen, Plus, Moon, Sun, Settings, Menu, LogOut, User, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { useListOpenaiConversations, useCreateOpenaiConversation } from "@workspace/api-client-react";
+import {
+  useListOpenaiConversations,
+  useCreateOpenaiConversation,
+  useDeleteOpenaiConversation,
+  getListOpenaiConversationsQueryKey,
+} from "@workspace/api-client-react";
 import { useTheme } from "./theme-provider";
 import { useClerk, useUser } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 interface LayoutProps {
@@ -17,9 +23,24 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const [location, setLocation] = useLocation();
   const { data: conversations = [], isLoading } = useListOpenaiConversations();
   const createConversation = useCreateOpenaiConversation();
+  const deleteConversation = useDeleteOpenaiConversation();
+  const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const { signOut } = useClerk();
   const { user } = useUser();
+
+  const handleDelete = (e: React.MouseEvent, id: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm("Delete this conversation?")) return;
+    const currentId = new URLSearchParams(window.location.search).get("id");
+    deleteConversation.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListOpenaiConversationsQueryKey() });
+        if (currentId === String(id)) setLocation("/");
+      },
+    });
+  };
 
   const handleNewChat = () => {
     createConversation.mutate(
@@ -82,26 +103,38 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 location === "/" &&
                 new URLSearchParams(window.location.search).get("id") === String(conv.id);
               return (
-                <Link href={`/?id=${conv.id}`} key={conv.id}>
-                  <div
-                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors text-sm truncate flex flex-col ${
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-accent text-sidebar-foreground"
-                    }`}
-                    data-testid={`link-conversation-${conv.id}`}
-                    onClick={onNavigate}
-                  >
-                    <span className="truncate">{conv.title || "New Conversation"}</span>
-                    <span
-                      className={`text-[10px] opacity-70 mt-0.5 ${
-                        isActive ? "text-primary-foreground" : "text-muted-foreground"
+                <div key={conv.id} className="relative group/item">
+                  <Link href={`/?id=${conv.id}`}>
+                    <div
+                      className={`px-3 py-2 pr-8 rounded-md cursor-pointer transition-colors text-sm truncate flex flex-col ${
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-accent text-sidebar-foreground"
                       }`}
+                      data-testid={`link-conversation-${conv.id}`}
+                      onClick={onNavigate}
                     >
-                      {format(new Date(conv.createdAt), "MMM d, yyyy")}
-                    </span>
-                  </div>
-                </Link>
+                      <span className="truncate">{conv.title || "New Conversation"}</span>
+                      <span
+                        className={`text-[10px] opacity-70 mt-0.5 ${
+                          isActive ? "text-primary-foreground" : "text-muted-foreground"
+                        }`}
+                      >
+                        {format(new Date(conv.createdAt), "MMM d, yyyy")}
+                      </span>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={(e) => handleDelete(e, conv.id)}
+                    className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded opacity-0 group-hover/item:opacity-100 transition-opacity hover:text-destructive ${
+                      isActive ? "text-primary-foreground/70" : "text-muted-foreground"
+                    }`}
+                    title="Delete conversation"
+                    data-testid={`button-delete-conv-${conv.id}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               );
             })
           )}

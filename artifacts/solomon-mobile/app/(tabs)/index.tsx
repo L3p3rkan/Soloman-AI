@@ -55,7 +55,7 @@ export default function CounselScreen() {
         style: "destructive",
         onPress: () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          deleteConversation.mutate({ id });
+          deleteConversation.mutate({ id }, { onSuccess: () => refetch() });
         },
       },
     ]);
