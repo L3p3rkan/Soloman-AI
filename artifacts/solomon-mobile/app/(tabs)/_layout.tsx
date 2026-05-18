@@ -1,8 +1,6 @@
 import { useEffect } from "react";
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Redirect, Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
@@ -10,27 +8,21 @@ import { useAuth } from "@clerk/expo";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 
-function NativeTabLayout() {
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "bubble.left", selected: "bubble.left.fill" }} />
-        <Label>Counsel</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="library">
-        <Icon sf={{ default: "books.vertical", selected: "books.vertical.fill" }} />
-        <Label>Library</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
-
-function ClassicTabLayout() {
+export default function TabsLayout() {
+  const { isSignedIn, isLoaded, getToken } = useAuth();
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+
+  useEffect(() => {
+    setAuthTokenGetter(() => getToken());
+  }, [getToken]);
+
+  if (isLoaded && !isSignedIn) {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
 
   return (
     <Tabs
@@ -80,22 +72,4 @@ function ClassicTabLayout() {
       />
     </Tabs>
   );
-}
-
-export default function TabsLayout() {
-  const { isSignedIn, isLoaded, getToken } = useAuth();
-
-  useEffect(() => {
-    setAuthTokenGetter(() => getToken());
-  }, [getToken]);
-
-  if (isLoaded && !isSignedIn) {
-    return <Redirect href="/(auth)/sign-in" />;
-  }
-
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-
-  return <ClassicTabLayout />;
 }
