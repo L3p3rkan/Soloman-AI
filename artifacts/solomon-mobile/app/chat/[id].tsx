@@ -50,7 +50,7 @@ export default function ChatScreen() {
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
 
   const { data: conversation } = useGetOpenaiConversation(convId);
-  const { data: serverMessages = [] } = useListOpenaiMessages(convId);
+  const { data: serverMessages = [], isLoading: isLoadingMessages } = useListOpenaiMessages(convId);
 
   // Build display list: persisted messages + optimistic overlay
   const allMessages: DisplayMessage[] = [
@@ -185,27 +185,33 @@ export default function ChatScreen() {
       </View>
 
       {/* Messages */}
-      <FlatList
-        data={reversed}
-        keyExtractor={(item) => item.key}
-        inverted={allMessages.length > 0}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
-        ListEmptyComponent={
-          <View style={styles.emptyChat}>
-            <View style={styles.solomonBadge}>
-              <Feather name="book-open" size={28} color={colors.primaryForeground} />
+      {isLoadingMessages && allMessages.length === 0 ? (
+        <View style={styles.loadingCenter}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      ) : (
+        <FlatList
+          data={reversed}
+          keyExtractor={(item) => item.key}
+          inverted={allMessages.length > 0}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
+          ListEmptyComponent={
+            <View style={styles.emptyChat}>
+              <View style={styles.solomonBadge}>
+                <Feather name="book-open" size={28} color={colors.primaryForeground} />
+              </View>
+              <Text style={styles.emptyChatTitle}>Ask Solomon</Text>
+              <Text style={styles.emptyChatText}>
+                Seek wisdom, biblical counsel, or scripture on any topic.
+              </Text>
             </View>
-            <Text style={styles.emptyChatTitle}>Ask Solomon</Text>
-            <Text style={styles.emptyChatText}>
-              Seek wisdom, biblical counsel, or scripture on any topic.
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => <MessageBubble message={item} colors={colors} />}
-      />
+          }
+          renderItem={({ item }) => <MessageBubble message={item} colors={colors} />}
+        />
+      )}
 
       {/* Input */}
       <View style={[styles.inputRow, { paddingBottom: botPad + 8 }]}>
@@ -310,6 +316,7 @@ const bubbleStyles = StyleSheet.create({
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
+    loadingCenter: { flex: 1, alignItems: "center", justifyContent: "center" },
     header: {
       flexDirection: "row",
       alignItems: "center",

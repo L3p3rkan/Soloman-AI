@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
   useGetOpenaiConversation, 
   useListOpenaiMessages, 
   getListOpenaiConversationsQueryKey,
+  getListOpenaiMessagesQueryKey,
   useCreateOpenaiConversation,
   useDeleteOpenaiConversation
 } from "@workspace/api-client-react";
@@ -16,9 +17,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, BookOpen, Trash2, Loader2 } from "lucide-react";
 
 export default function ChatPage() {
-  const [location, setLocation] = useLocation();
-  const searchParams = new URLSearchParams(window.location.search);
-  const conversationIdStr = searchParams.get("id");
+  const [, setLocation] = useLocation();
+  const search = useSearch();
+  const conversationIdStr = new URLSearchParams(search).get("id");
   const conversationId = conversationIdStr ? parseInt(conversationIdStr, 10) : null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,7 +116,7 @@ export default function ChatPage() {
       setIsStreaming(false);
       setOptimisticMessage(null);
       setStreamingContent("");
-      queryClient.invalidateQueries({ queryKey: ["/api/openai/conversations", targetId, "messages"] });
+      queryClient.invalidateQueries({ queryKey: getListOpenaiMessagesQueryKey(targetId) });
       queryClient.invalidateQueries({ queryKey: getListOpenaiConversationsQueryKey() });
     }
   };
