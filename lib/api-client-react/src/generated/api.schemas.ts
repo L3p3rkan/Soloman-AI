@@ -58,6 +58,15 @@ export interface AdminStatus {
   isAdmin: boolean;
 }
 
+export interface UserProfile {
+  userId: string;
+  displayName: string | null;
+}
+
+export interface UserProfileInput {
+  displayName: string;
+}
+
 export interface ApiError {
   error: string;
 }

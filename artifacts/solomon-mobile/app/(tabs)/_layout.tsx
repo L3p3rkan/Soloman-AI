@@ -5,7 +5,7 @@ import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useAuth } from "@clerk/expo";
-import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { setAuthTokenGetter, useGetProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 
 export default function TabsLayout() {
@@ -20,8 +20,16 @@ export default function TabsLayout() {
     setAuthTokenGetter(() => getToken());
   }, [getToken]);
 
+  const { data: profile, isLoading: profileLoading } = useGetProfile({
+    query: { enabled: isLoaded && !!isSignedIn, queryKey: getGetProfileQueryKey() },
+  });
+
   if (isLoaded && !isSignedIn) {
     return <Redirect href="/(auth)/sign-in" />;
+  }
+
+  if (!profileLoading && isLoaded && isSignedIn && !profile?.displayName) {
+    return <Redirect href="/name" />;
   }
 
   return (

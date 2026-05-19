@@ -29,7 +29,9 @@ import type {
   HealthStatus,
   MessageInput,
   OpenaiConversation,
-  OpenaiMessage
+  OpenaiMessage,
+  UserProfile,
+  UserProfileInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -788,6 +790,154 @@ export const useDeleteBibleVersion = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getDeleteBibleVersionMutationOptions(options));
+    }
+
+export const getGetProfileUrl = () => {
+
+
+
+
+  return `/api/profile`
+}
+
+/**
+ * @summary Get the current user's profile
+ */
+export const getProfile = async ( options?: RequestInit): Promise<UserProfile> => {
+
+  return customFetch<UserProfile>(getGetProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProfileQueryKey = () => {
+    return [
+    `/api/profile`
+    ] as const;
+    }
+
+
+export const getGetProfileQueryOptions = <TData = Awaited<ReturnType<typeof getProfile>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProfileQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProfile>>> = ({ signal }) => getProfile({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getProfile>>>
+export type GetProfileQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the current user's profile
+ */
+
+export function useGetProfile<TData = Awaited<ReturnType<typeof getProfile>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProfileQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpsertProfileUrl = () => {
+
+
+
+
+  return `/api/profile`
+}
+
+/**
+ * @summary Create or update the current user's profile
+ */
+export const upsertProfile = async (userProfileInput: UserProfileInput, options?: RequestInit): Promise<UserProfile> => {
+
+  return customFetch<UserProfile>(getUpsertProfileUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      userProfileInput,)
+  }
+);}
+
+
+
+
+export const getUpsertProfileMutationOptions = <TError = ErrorType<ApiError | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertProfile>>, TError,{data: BodyType<UserProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertProfile>>, TError,{data: BodyType<UserProfileInput>}, TContext> => {
+
+const mutationKey = ['upsertProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertProfile>>, {data: BodyType<UserProfileInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertProfileMutationResult = NonNullable<Awaited<ReturnType<typeof upsertProfile>>>
+    export type UpsertProfileMutationBody = BodyType<UserProfileInput>
+    export type UpsertProfileMutationError = ErrorType<ApiError | void>
+
+    /**
+ * @summary Create or update the current user's profile
+ */
+export const useUpsertProfile = <TError = ErrorType<ApiError | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertProfile>>, TError,{data: BodyType<UserProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertProfile>>,
+        TError,
+        {data: BodyType<UserProfileInput>},
+        TContext
+      > => {
+      return useMutation(getUpsertProfileMutationOptions(options));
     }
 
 export const getGetBibleStatsUrl = () => {

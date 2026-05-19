@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, asc, and } from "drizzle-orm";
-import { db, conversations, messages } from "@workspace/db";
+import { db, conversations, messages, userProfiles } from "@workspace/db";
 import {
   CreateOpenaiConversationBody,
   SendOpenaiMessageBody,
@@ -158,11 +158,17 @@ router.post("/openai/conversations/:id/messages", requireAuth, async (req, res):
       .where(eq(conversations.id, convId));
   }
 
+  const [profile] = await db
+    .select({ displayName: userProfiles.displayName })
+    .from(userProfiles)
+    .where(eq(userProfiles.userId, req.userId!));
+
   const bibleContext = await buildSolomonContext(userContent);
   const chatMessages = buildChatMessages(
     history.map((m) => ({ role: m.role, content: m.content })),
     userContent,
-    bibleContext
+    bibleContext,
+    profile?.displayName ?? undefined
   );
 
   res.setHeader("Content-Type", "text/event-stream");

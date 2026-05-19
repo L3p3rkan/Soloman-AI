@@ -16,3 +16,5 @@ export * from './healthStatus';
 export * from './messageInput';
 export * from './openaiConversation';
 export * from './openaiMessage';
+export * from './userProfile';
+export * from './userProfileInput';

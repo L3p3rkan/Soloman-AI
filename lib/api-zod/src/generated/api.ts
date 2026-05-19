@@ -125,6 +125,28 @@ export const DeleteBibleVersionParams = zod.object({
 
 
 /**
+ * @summary Get the current user's profile
+ */
+export const GetProfileResponse = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string().nullable()
+})
+
+
+/**
+ * @summary Create or update the current user's profile
+ */
+export const UpsertProfileBody = zod.object({
+  "displayName": zod.string()
+})
+
+export const UpsertProfileResponse = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string().nullable()
+})
+
+
+/**
  * @summary Get aggregate stats across all uploaded Bible versions
  */
 export const GetBibleStatsResponse = zod.object({

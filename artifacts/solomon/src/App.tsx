@@ -12,6 +12,7 @@ import ChatPage from "@/pages/chat";
 import LibraryPage from "@/pages/library";
 import LandingPage from "@/pages/landing";
 import NotFound from "@/pages/not-found";
+import { NameGate } from "@/components/name-gate";
 
 const queryClient = new QueryClient();
 
@@ -104,7 +105,9 @@ function HomeRoute() {
   return (
     <>
       <Show when="signed-in">
-        <ChatPage />
+        <NameGate>
+          <ChatPage />
+        </NameGate>
       </Show>
       <Show when="signed-out">
         <LandingPage />
@@ -117,7 +120,9 @@ function LibraryRoute() {
   return (
     <>
       <Show when="signed-in">
-        <LibraryPage />
+        <NameGate>
+          <LibraryPage />
+        </NameGate>
       </Show>
       <Show when="signed-out">
         <Redirect to="/sign-in" />
