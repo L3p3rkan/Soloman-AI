@@ -45,6 +45,7 @@ function RootLayoutNav() {
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="name" />
       <Stack.Screen
         name="chat/[id]"
         options={{ headerShown: false, presentation: "card" }}
