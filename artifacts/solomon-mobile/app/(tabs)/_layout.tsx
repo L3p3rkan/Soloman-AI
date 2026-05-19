@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BlurView } from "expo-blur";
 import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useAuth } from "@clerk/expo";
 import { setAuthTokenGetter, useGetProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
@@ -16,19 +16,43 @@ export default function TabsLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
 
+  // Track when the auth token getter has been registered so we don't fire
+  // the profile query before it's ready (would get a 401 on every first load).
+  const [tokenReady, setTokenReady] = useState(false);
+
   useEffect(() => {
     setAuthTokenGetter(() => getToken());
+    setTokenReady(true);
   }, [getToken]);
 
-  const { data: profile, isLoading: profileLoading } = useGetProfile({
-    query: { enabled: isLoaded && !!isSignedIn, queryKey: getGetProfileQueryKey() },
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    isSuccess: profileLoaded,
+  } = useGetProfile({
+    query: {
+      enabled: isLoaded && !!isSignedIn && tokenReady,
+      queryKey: getGetProfileQueryKey(),
+    },
   });
 
-  if (isLoaded && !isSignedIn) {
-    return <Redirect href="/(auth)/sign-in" />;
+  // Still resolving auth state
+  if (!isLoaded) return null;
+
+  // Not signed in → go to auth
+  if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
+
+  // Waiting for token registration or profile fetch
+  if (!tokenReady || profileLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
   }
 
-  if (!profileLoading && isLoaded && isSignedIn && !profile?.displayName) {
+  // Profile confirmed no name → collect it first
+  if (profileLoaded && !profile?.displayName) {
     return <Redirect href="/name" />;
   }
 
