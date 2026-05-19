@@ -185,7 +185,7 @@ export async function searchBiblePassages(keywords: string[], maxResults = 12): 
   const results: Array<{ ref: string; text: string; score: number; version: string }> = [];
   const lowerKeywords = keywords.map((k) => k.toLowerCase());
 
-  for (const meta of versions.slice(0, 2)) {
+  for (const meta of versions) {
     const data = await loadBibleData(meta.id);
     if (!data) continue;
 

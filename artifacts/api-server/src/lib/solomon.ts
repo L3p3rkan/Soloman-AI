@@ -1,4 +1,4 @@
-import { searchBiblePassages, extractKeywords } from "./bible";
+import { searchBiblePassages, extractKeywords, listBibleVersions } from "./bible";
 
 export const SOLOMON_SYSTEM_PROMPT = `You are Solomon — a wise, Spirit-filled biblical preacher and counselor. You speak with the authority of scripture, the warmth of a shepherd, and the clarity of someone who has spent a lifetime in the Word of God.
 
@@ -23,14 +23,27 @@ You do not shy away from difficult truths, but you speak them with compassion. Y
 Begin each response by addressing the person's heart before addressing their situation. End each response with a word of prayer or blessing when appropriate.`;
 
 export async function buildSolomonContext(userMessage: string): Promise<string> {
-  const keywords = extractKeywords(userMessage);
-  const passages = await searchBiblePassages(keywords, 10);
+  const [keywords, versions] = await Promise.all([
+    Promise.resolve(extractKeywords(userMessage)),
+    listBibleVersions(),
+  ]);
 
-  if (!passages) {
-    return "";
+  const passages = await searchBiblePassages(keywords, 12);
+
+  const parts: string[] = [];
+
+  if (versions.length > 0) {
+    const versionList = versions
+      .map((v) => `${v.name} (${v.abbreviation}) — ${v.verseCount.toLocaleString()} verses`)
+      .join(", ");
+    parts.push(`BIBLE LIBRARY (${versions.length} version${versions.length === 1 ? "" : "s"} available): ${versionList}`);
   }
 
-  return `\n\nRELEVANT SCRIPTURE FROM THE UPLOADED BIBLE LIBRARY:\n${passages}\n\nDraw from these passages in your response where they are applicable. You may reference other scripture you know as well.`;
+  if (passages) {
+    parts.push(`RELEVANT SCRIPTURE FROM THE BIBLE LIBRARY:\n${passages}\n\nDraw from these passages in your response where they are applicable. You may reference other scripture you know as well.`);
+  }
+
+  return parts.length > 0 ? "\n\n" + parts.join("\n\n") : "";
 }
 
 export function buildChatMessages(
