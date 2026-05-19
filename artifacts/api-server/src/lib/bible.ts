@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { eq } from "drizzle-orm";
+import { db, bibles } from "@workspace/db";
 import { logger } from "./logger";
 
-const BIBLES_DIR = path.resolve(process.cwd(), "data/bibles");
-
-if (!fs.existsSync(BIBLES_DIR)) {
-  fs.mkdirSync(BIBLES_DIR, { recursive: true });
-}
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface BibleVerse {
   verse: number;
@@ -37,37 +37,78 @@ export interface BibleVersionMeta {
   uploadedAt: string;
 }
 
-function getMetaPath(id: string): string {
-  return path.join(BIBLES_DIR, `${id}.meta.json`);
-}
+// ---------------------------------------------------------------------------
+// Startup: migrate any existing disk files into the database once
+// ---------------------------------------------------------------------------
 
-function getDataPath(id: string): string {
-  return path.join(BIBLES_DIR, `${id}.data.json`);
-}
+const LEGACY_BIBLES_DIR = path.resolve(process.cwd(), "data/bibles");
 
-export function listBibleVersions(): BibleVersionMeta[] {
-  if (!fs.existsSync(BIBLES_DIR)) return [];
-  const files = fs.readdirSync(BIBLES_DIR).filter((f) => f.endsWith(".meta.json"));
-  const versions: BibleVersionMeta[] = [];
-  for (const file of files) {
+export async function migrateDiskBibles(): Promise<void> {
+  if (!fs.existsSync(LEGACY_BIBLES_DIR)) return;
+
+  const metaFiles = fs.readdirSync(LEGACY_BIBLES_DIR).filter((f) => f.endsWith(".meta.json"));
+  if (metaFiles.length === 0) return;
+
+  for (const file of metaFiles) {
     try {
-      const content = fs.readFileSync(path.join(BIBLES_DIR, file), "utf-8");
-      versions.push(JSON.parse(content) as BibleVersionMeta);
+      const id = file.replace(".meta.json", "");
+      const existing = await db.select({ id: bibles.id }).from(bibles).where(eq(bibles.id, id));
+      if (existing.length > 0) continue;
+
+      const meta = JSON.parse(
+        fs.readFileSync(path.join(LEGACY_BIBLES_DIR, file), "utf-8")
+      ) as BibleVersionMeta;
+
+      const dataPath = path.join(LEGACY_BIBLES_DIR, `${id}.data.json`);
+      if (!fs.existsSync(dataPath)) continue;
+
+      const bibleData = JSON.parse(fs.readFileSync(dataPath, "utf-8")) as BibleData;
+
+      await db.insert(bibles).values({
+        id: meta.id,
+        name: meta.name,
+        abbreviation: meta.abbreviation,
+        bookCount: meta.bookCount,
+        verseCount: meta.verseCount,
+        booksData: bibleData as unknown as Record<string, unknown>,
+        uploadedAt: new Date(meta.uploadedAt),
+      });
+
+      logger.info({ id, name: meta.name }, "Migrated Bible from disk to database");
     } catch (e) {
-      logger.warn({ file }, "Failed to read Bible meta file");
+      logger.warn({ file, err: e }, "Failed to migrate Bible disk file");
     }
   }
-  return versions.sort(
-    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-  );
 }
 
-export function saveBibleVersion(
+// ---------------------------------------------------------------------------
+// CRUD
+// ---------------------------------------------------------------------------
+
+export async function listBibleVersions(): Promise<BibleVersionMeta[]> {
+  const rows = await db
+    .select({
+      id: bibles.id,
+      name: bibles.name,
+      abbreviation: bibles.abbreviation,
+      bookCount: bibles.bookCount,
+      verseCount: bibles.verseCount,
+      uploadedAt: bibles.uploadedAt,
+    })
+    .from(bibles)
+    .orderBy(bibles.uploadedAt);
+
+  return rows
+    .map((r) => ({ ...r, uploadedAt: r.uploadedAt.toISOString() }))
+    .reverse();
+}
+
+export async function saveBibleVersion(
   id: string,
   name: string,
   abbreviation: string,
   data: BibleData
-): BibleVersionMeta {
+): Promise<BibleVersionMeta> {
   let verseCount = 0;
   for (const book of data.books) {
     for (const chapter of book.chapters) {
@@ -75,56 +116,77 @@ export function saveBibleVersion(
     }
   }
 
-  const meta: BibleVersionMeta = {
+  const uploadedAt = new Date();
+
+  await db.insert(bibles).values({
     id,
     name,
     abbreviation,
     bookCount: data.books.length,
     verseCount,
-    uploadedAt: new Date().toISOString(),
+    booksData: data as unknown as Record<string, unknown>,
+    uploadedAt,
+  });
+
+  logger.info({ id, name, bookCount: data.books.length, verseCount }, "Bible version saved");
+
+  return {
+    id,
+    name,
+    abbreviation,
+    bookCount: data.books.length,
+    verseCount,
+    uploadedAt: uploadedAt.toISOString(),
   };
-
-  fs.writeFileSync(getMetaPath(id), JSON.stringify(meta, null, 2));
-  fs.writeFileSync(getDataPath(id), JSON.stringify(data));
-
-  logger.info({ id, name, bookCount: meta.bookCount, verseCount }, "Bible version saved");
-  return meta;
 }
 
-export function deleteBibleVersion(id: string): boolean {
-  const metaPath = getMetaPath(id);
-  const dataPath = getDataPath(id);
-  if (!fs.existsSync(metaPath)) return false;
-  fs.rmSync(metaPath, { force: true });
-  fs.rmSync(dataPath, { force: true });
+export async function deleteBibleVersion(id: string): Promise<boolean> {
+  const result = await db.delete(bibles).where(eq(bibles.id, id)).returning({ id: bibles.id });
+  if (result.length === 0) return false;
   logger.info({ id }, "Bible version deleted");
   return true;
 }
 
-export function getBibleVersionMeta(id: string): BibleVersionMeta | null {
-  const metaPath = getMetaPath(id);
-  if (!fs.existsSync(metaPath)) return null;
-  return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as BibleVersionMeta;
+export async function getBibleVersionMeta(id: string): Promise<BibleVersionMeta | null> {
+  const [row] = await db
+    .select({
+      id: bibles.id,
+      name: bibles.name,
+      abbreviation: bibles.abbreviation,
+      bookCount: bibles.bookCount,
+      verseCount: bibles.verseCount,
+      uploadedAt: bibles.uploadedAt,
+    })
+    .from(bibles)
+    .where(eq(bibles.id, id));
+
+  if (!row) return null;
+  return { ...row, uploadedAt: row.uploadedAt.toISOString() };
 }
 
-export function loadBibleData(id: string): BibleData | null {
-  const dataPath = getDataPath(id);
-  if (!fs.existsSync(dataPath)) return null;
-  return JSON.parse(fs.readFileSync(dataPath, "utf-8")) as BibleData;
+export async function loadBibleData(id: string): Promise<BibleData | null> {
+  const [row] = await db
+    .select({ booksData: bibles.booksData })
+    .from(bibles)
+    .where(eq(bibles.id, id));
+
+  if (!row) return null;
+  return row.booksData as unknown as BibleData;
 }
 
-/** Search all loaded Bibles for verses relevant to keywords */
-export function searchBiblePassages(keywords: string[], maxResults = 12): string {
-  const versions = listBibleVersions();
-  if (versions.length === 0) {
-    return "";
-  }
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+export async function searchBiblePassages(keywords: string[], maxResults = 12): Promise<string> {
+  const versions = await listBibleVersions();
+  if (versions.length === 0) return "";
 
   const results: Array<{ ref: string; text: string; score: number; version: string }> = [];
   const lowerKeywords = keywords.map((k) => k.toLowerCase());
 
   for (const meta of versions.slice(0, 2)) {
-    const data = loadBibleData(meta.id);
+    const data = await loadBibleData(meta.id);
     if (!data) continue;
 
     for (const book of data.books) {
@@ -150,13 +212,14 @@ export function searchBiblePassages(keywords: string[], maxResults = 12): string
 
   results.sort((a, b) => b.score - a.score);
   const top = results.slice(0, maxResults);
-
   if (top.length === 0) return "";
 
-  return top
-    .map((r) => `${r.ref} (${r.version}): "${r.text}"`)
-    .join("\n");
+  return top.map((r) => `${r.ref} (${r.version}): "${r.text}"`).join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Parsers (unchanged)
+// ---------------------------------------------------------------------------
 
 /**
  * Parse a plain-text Bible file into BibleData.
@@ -181,8 +244,6 @@ export function parsePlainTextBible(text: string, abbreviation: string): BibleDa
   const lines = text.split(/\r?\n/);
   const booksMap = new Map<string, Map<number, Map<number, string>>>();
 
-  // Try Format A/B first — look for lines that start with a book reference
-  // Pattern: optional whitespace, word(s) for book name, space or separator, chapter:verse or chapter sep verse
   const refLinePattern =
     /^([1-3]?\s*[A-Za-z][A-Za-z\s']+?)\s+(\d+)[:\s|](\d+)[:\s|]?\s*(.+)$/;
   const pipeSepPattern =
@@ -224,7 +285,6 @@ export function parsePlainTextBible(text: string, abbreviation: string): BibleDa
     }
   }
 
-  // Format C fallback — header-based sectioned format
   if (parsedCount === 0) {
     let currentBook: string | null = null;
     let currentChapter: number | null = null;
@@ -244,24 +304,22 @@ export function parsePlainTextBible(text: string, abbreviation: string): BibleDa
 
       const verseMatch = line.match(numberedVersePattern);
       if (verseMatch && currentBook && currentChapter) {
-        const verseNum = parseInt(verseMatch[1], 10);
-        const verseText = verseMatch[2].trim();
-        if (verseNum > 0 && verseNum <= 200 && verseText.length > 2) {
+        const vNum = parseInt(verseMatch[1], 10);
+        const vText = verseMatch[2].trim();
+        if (vNum > 0 && vNum <= 200 && vText.length > 2) {
           if (!booksMap.has(currentBook)) booksMap.set(currentBook, new Map());
           const chaptersMap = booksMap.get(currentBook)!;
           if (!chaptersMap.has(currentChapter)) chaptersMap.set(currentChapter, new Map());
-          chaptersMap.get(currentChapter)!.set(verseNum, verseText);
+          chaptersMap.get(currentChapter)!.set(vNum, vText);
           parsedCount++;
         }
         continue;
       }
 
-      // Treat as potential book header (all caps or title case, no digits)
       if (!line.match(/\d/) && line.length > 2 && line.length < 40) {
         const bookMatch = line.match(bookHeaderPattern);
         if (bookMatch) {
           const candidate = bookMatch[1].trim();
-          // Simple title-case or all-caps check
           if (candidate === candidate.toUpperCase() || /^[A-Z][a-z]/.test(candidate)) {
             currentBook = candidate;
             currentChapter = null;
@@ -281,14 +339,13 @@ export function parsePlainTextBible(text: string, abbreviation: string): BibleDa
     );
   }
 
-  // Convert map structure to BibleData
   const books: BibleBook[] = [];
   for (const [bookName, chaptersMap] of booksMap) {
     const chapters: BibleChapter[] = [];
     for (const [chapterNum, versesMap] of chaptersMap) {
       const verses: BibleVerse[] = [];
-      for (const [verseNum, text] of versesMap) {
-        verses.push({ verse: verseNum, text });
+      for (const [verseNum, t] of versesMap) {
+        verses.push({ verse: verseNum, text: t });
       }
       verses.sort((a, b) => a.verse - b.verse);
       chapters.push({ chapter: chapterNum, verses });

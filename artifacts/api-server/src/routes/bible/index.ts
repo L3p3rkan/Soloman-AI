@@ -5,7 +5,6 @@ import {
   listBibleVersions,
   saveBibleVersion,
   deleteBibleVersion,
-  getBibleVersionMeta,
   parsePlainTextBible,
   type BibleData,
 } from "../../lib/bible";
@@ -18,7 +17,7 @@ const router: IRouter = Router();
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const isJson = file.mimetype === "application/json" || file.originalname.endsWith(".json");
     const isTxt = file.mimetype === "text/plain" || file.originalname.endsWith(".txt");
@@ -31,7 +30,7 @@ const upload = multer({
 });
 
 router.get("/bible/versions", async (_req, res): Promise<void> => {
-  const versions = listBibleVersions();
+  const versions = await listBibleVersions();
   res.json(versions);
 });
 
@@ -63,19 +62,14 @@ router.post(
     let bibleData: BibleData;
     try {
       if (isTxt) {
-        // Plain-text Bible format
         const text = req.file.buffer.toString("utf-8");
         bibleData = parsePlainTextBible(text, abbreviation);
       } else {
-        // JSON Bible format
         const raw = JSON.parse(req.file.buffer.toString("utf-8"));
 
-        // Normalize various common JSON Bible formats
         if (Array.isArray(raw)) {
-          // Format: array of books
           bibleData = { version: abbreviation, books: raw };
         } else if (raw.books && Array.isArray(raw.books)) {
-          // Standard format: { version, books[] }
           bibleData = raw as BibleData;
         } else if (raw.OSIS) {
           res.status(400).json({
@@ -104,8 +98,7 @@ router.post(
     }
 
     const id = randomUUID();
-    const meta = saveBibleVersion(id, name, abbreviation, bibleData);
-
+    const meta = await saveBibleVersion(id, name, abbreviation, bibleData);
     res.status(201).json(meta);
   }
 );
@@ -117,7 +110,7 @@ router.delete("/bible/versions/:versionId", requireAuth, requireAdmin, async (re
     return;
   }
 
-  const deleted = deleteBibleVersion(params.data.versionId);
+  const deleted = await deleteBibleVersion(params.data.versionId);
   if (!deleted) {
     res.status(404).json({ error: "Bible version not found" });
     return;
@@ -127,7 +120,7 @@ router.delete("/bible/versions/:versionId", requireAuth, requireAdmin, async (re
 });
 
 router.get("/bible/stats", async (_req, res): Promise<void> => {
-  const versions = listBibleVersions();
+  const versions = await listBibleVersions();
   const totalBooks = versions.reduce((sum, v) => sum + v.bookCount, 0);
   const totalVerses = versions.reduce((sum, v) => sum + v.verseCount, 0);
 

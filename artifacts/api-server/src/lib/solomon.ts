@@ -25,9 +25,9 @@ You do not shy away from difficult truths, but you speak them with compassion. Y
 
 Begin each response by addressing the person's heart before addressing their situation. End each response with a word of prayer or blessing when appropriate.`;
 
-export function buildSolomonContext(userMessage: string): string {
+export async function buildSolomonContext(userMessage: string): Promise<string> {
   const keywords = extractKeywords(userMessage);
-  const passages = searchBiblePassages(keywords, 10);
+  const passages = await searchBiblePassages(keywords, 10);
 
   if (!passages) {
     return "";

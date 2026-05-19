@@ -158,7 +158,7 @@ router.post("/openai/conversations/:id/messages", requireAuth, async (req, res):
       .where(eq(conversations.id, convId));
   }
 
-  const bibleContext = buildSolomonContext(userContent);
+  const bibleContext = await buildSolomonContext(userContent);
   const chatMessages = buildChatMessages(
     history.map((m) => ({ role: m.role, content: m.content })),
     userContent,
