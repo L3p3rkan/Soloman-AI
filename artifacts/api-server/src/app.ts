@@ -1,6 +1,8 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "node:path";
+import fs from "node:fs";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import {
@@ -50,5 +52,16 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Static file serving — active only when PUBLIC_DIR is set (e.g. Docker deployments).
+// Serves the pre-built web frontend and falls back to index.html for SPA routing.
+const publicDir = process.env.PUBLIC_DIR;
+if (publicDir && fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir));
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api")) return next();
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
+}
 
 export default app;
