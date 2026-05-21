@@ -55,7 +55,8 @@ RUN pnpm --filter @workspace/api-server run build
 # ── Self-contained production deployment ─────────────────────────────────────
 # pnpm deploy copies the package + its production node_modules (flattened,
 # no symlinks) to /api-deploy — safe to COPY into the next stage.
-RUN pnpm --filter @workspace/api-server deploy --prod /api-deploy
+# pnpm v10 requires --legacy for the traditional deploy behaviour in workspaces
+RUN pnpm --filter @workspace/api-server deploy --prod --legacy /api-deploy
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────────────────
 # Alpine is fine here — we only run pre-built JS, no native tool binaries.
