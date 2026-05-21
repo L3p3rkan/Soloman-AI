@@ -5,7 +5,9 @@
 # incompatible — those prebuilt binaries will segfault or be missing.
 FROM node:24-slim AS builder
 
-RUN corepack enable
+# Install the exact pnpm version that generated pnpm-lock.yaml (lockfileVersion 9.0 = pnpm 10).
+# corepack enable alone uses the bundled default (pnpm 9.x), which cannot read this lockfile.
+RUN corepack enable && corepack prepare pnpm@10.26.1 --activate
 
 WORKDIR /app
 
