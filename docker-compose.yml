@@ -10,9 +10,25 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U solomon"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  # Runs drizzle-kit push to create/update the DB schema before the app starts.
+  # Uses the builder image (which has devDeps including drizzle-kit).
+  # Postgres is guaranteed healthy before this runs (service_healthy condition).
+  migrate:
+    build:
+      context: .
+      target: builder
+    working_dir: /app/lib/db
+    command: pnpm run push
+    environment:
+      DATABASE_URL: postgres://solomon:${POSTGRES_PASSWORD:-changeme}@postgres:5432/solomon
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
 
   solomon:
     build: .
@@ -24,22 +40,22 @@ services:
       NODE_ENV: production
       PUBLIC_DIR: /app/public
 
-      # PostgreSQL — points at the postgres service above
+      # PostgreSQL
       DATABASE_URL: postgres://solomon:${POSTGRES_PASSWORD:-changeme}@postgres:5432/solomon
 
-      # Clerk authentication — required, get from your Clerk dashboard
+      # Clerk — required; get from your Clerk dashboard (or Replit Auth pane)
       CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
 
-      # AI (OpenAI-compatible) — required for Solomon chat
+      # OpenAI-compatible AI endpoint — required for Solomon chat
       AI_INTEGRATIONS_OPENAI_BASE_URL: ${AI_INTEGRATIONS_OPENAI_BASE_URL}
       AI_INTEGRATIONS_OPENAI_API_KEY: ${AI_INTEGRATIONS_OPENAI_API_KEY}
 
-      # Optional: restrict Bible admin actions to specific emails
+      # Optional: comma-separated admin emails for Bible management
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
