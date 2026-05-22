@@ -76,10 +76,10 @@ COPY --from=builder /app/artifacts/solomon/dist/public ./public
 # PORT       — TCP port the server listens on
 # NODE_ENV   — disables dev-only middleware
 # PUBLIC_DIR — tells app.ts to serve ./public as a static SPA
-ENV PORT=8080 \
+ENV PORT=8090 \
     NODE_ENV=production \
     PUBLIC_DIR=/app/public
 
-EXPOSE 8080
+EXPOSE 8090
 
 CMD ["node", "--enable-source-maps", "./dist/index.mjs"]
