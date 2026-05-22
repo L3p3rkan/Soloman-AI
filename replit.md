@@ -4,7 +4,7 @@ Solomon is an AI-powered preacher and counselor that answers every question with
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8090)
 - `pnpm --filter @workspace/solomon run dev` — run the frontend (port 22232)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
